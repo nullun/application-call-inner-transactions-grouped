@@ -1,0 +1,147 @@
+#pragma version 6
+
+txn ApplicationID
+bz handle_setup
+
+txn OnCompletion
+int UpdateApplication
+==
+txn OnCompletion
+int DeleteApplication
+==
+||
+bnz handle_update_or_delete
+
+method "deploy_app()void"
+txna ApplicationArgs 0
+==
+bnz method_deploy_app
+
+method "call_app()void"
+txna ApplicationArgs 0
+==
+bnz method_call_app
+
+method "delete_app(appl,appl)void"
+txna ApplicationArgs 0
+==
+bnz method_delete_app
+
+err
+
+handle_setup:
+	int 1
+	return
+
+handle_update_or_delete:
+	txn Sender
+	global CreatorAddress
+	==
+	return
+
+method_deploy_app:
+	// Make sure this is being called in conjunction with
+	// delete_app(appl,appl)void of the same application
+	txn GroupIndex
+	int 2
+	+
+	gtxns ApplicationID
+	txn ApplicationID
+	==
+	assert
+
+	method "delete_app(appl,appl)void"
+	txn GroupIndex
+	int 2
+	+
+	int 0 // method sig
+	gtxnsas ApplicationArgs
+	==
+	assert
+
+	// Perform inner transaction
+	itxn_begin
+
+	int appl
+	itxn_field TypeEnum
+
+	byte base64 BoEB
+	itxn_field ApprovalProgram
+
+	byte base64 BoEB
+	itxn_field ClearStateProgram
+
+	int 0
+	itxn_field Fee
+
+	itxn_submit
+
+	gitxn 0 CreatedApplicationID
+	store 0
+
+	int 1
+	return
+
+method_call_app:
+	// Make sure this is being called in conjunction with
+	// delete_app(appl,appl)void of the same application
+	txn GroupIndex
+	int 1
+	+
+	gtxns ApplicationID
+	txn ApplicationID
+	==
+	assert
+
+	method "delete_app(appl,appl)void"
+	txn GroupIndex
+	int 1
+	+
+	int 0 // method sig
+	gtxnsas ApplicationArgs
+	==
+	assert
+
+	// Perform inner transaction
+	itxn_begin
+
+	int appl
+	itxn_field TypeEnum
+
+	txn GroupIndex
+	int 1
+	-
+	gloads 0
+	itxn_field ApplicationID
+
+	int 0
+	itxn_field Fee
+
+	itxn_submit
+
+	int 1
+	return
+
+method_delete_app:
+	itxn_begin
+
+	int appl
+	itxn_field TypeEnum
+
+	int DeleteApplication
+	itxn_field OnCompletion
+
+	txn GroupIndex
+	int 2
+	-
+	gloads 0
+	itxn_field ApplicationID
+
+	int 0
+	itxn_field Fee
+
+	itxn_submit
+
+	int 1
+	return
+
